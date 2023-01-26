@@ -135,7 +135,7 @@ void traceBack(vector<vector<int>> DPtable, string s1, string s2, int i, int j, 
         }
     }
 
-    cout << "Alig 1: " << align1 << endl;
+    cout << "Align 1: " << align1 << endl;
     cout << "Align 2: " << align2 << endl;
     cout << "Match: " << match << " | ";
     cout << "Mismatch: " << mismatch << " | ";
