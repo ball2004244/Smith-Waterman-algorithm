@@ -7,56 +7,75 @@
 using namespace std;
 
 /*
-    SMITH WATERMAN Algorithm (Space Optimized + Affine Gap Penalty)
+    SMITH WATERMAN BEYER Algorithm (Space Optimized + Affine Gap Penalty)
 */
 
 // find max score inside a map
 int findMax(map<pair<int, int>, int> DPmap)
 {
     int max_score = INT_MIN;
-
     for (auto item : DPmap)
-    {
         max_score = max(max_score, item.second);
-    }
+    
     return max_score;
 }
+
 // create a map with pairs to store (i, j) instead of orignial 2D table
-map<pair<int, int>, int> smithWaterman(string s1, string s2, int match, int mismatch, int gap)
+map<pair<int, int>, int> smithWaterman(map<pair<int, int>, bool> &gap_extend, string s1, string s2, int match, int mismatch, int open_gap, int gap)
 {
     int score = 0;
     int above = 0;
     int left = 0;
     map<pair<int, int>, int> DPmap;
+    DPmap[{0, 0}] = 0; // base case, (0, 0) is the position in the matrix
+
+    // base case
+    gap_extend[{0, 0}] = false;
+
+    // initialize first row and column
+    for (int i = 1; i < s1.length() + 1; i++)
+    {
+        DPmap[{i, 0}] = open_gap + gap * i;
+        gap_extend[{i, 0}] = false;
+    }
+
+    for (int j = 1; j < s2.length() + 1; j++)
+    {
+        DPmap[{0, j}] = open_gap + gap * j;
+        gap_extend[{0, j}] = false;
+    }
 
     for (int i = 1; i < s1.length() + 1; i++)
     {
         for (int j = 1; j < s2.length() + 1; j++)
         {
             if (s1[i - 1] == s2[j - 1])
-            {
                 score = match;
-                if (DPmap.count({i - 1, j - 1}))
-                    score += DPmap[{i - 1, j - 1}];
-            }
             else
-            {
                 score = mismatch;
-                if (DPmap.count({i - 1, j - 1}))
-                    score += DPmap[{i - 1, j - 1}];
-            }
-            above = gap;
 
+            if (DPmap.count({i - 1, j - 1}))
+                score += DPmap[{i - 1, j - 1}];
+
+            above = gap;
             if (DPmap.count({i - 1, j}))
                 above += DPmap[{i - 1, j}];
+
+            if (gap_extend[{i - 1, j}] != true)
+                above += open_gap;
 
             left = gap;
 
             if (DPmap.count({i, j - 1}))
                 left += DPmap[{i, j - 1}];
 
-            if (max({score, above, left}) > 0)
-                DPmap[{i, j}] = max({score, above, left});
+            if (gap_extend[{i, j - 1}] != true)
+                left += open_gap;
+
+            DPmap[{i, j}] = max({score, above, left});
+            if (DPmap[{i, j}]== above || DPmap[{i, j}] == left)
+                gap_extend[{i, j}] = true;
+            else gap_extend[{i, j}] = false;
         }
     }
     return DPmap;
@@ -89,47 +108,48 @@ void printMap(map<pair<int, int>, int> DPmap, string s1, string s2)
     }
 }
 
-void traceBack(map<pair<int, int>, int> DPmap, string s1, string s2, int match = 1, int mismatch = -1, int gap = -2)
+void traceBack(map<pair<int, int>, int> DPmap, map<pair<int, int>, bool> gap_extend, string s1, string s2, int match = 1, int mismatch = -1, int open_gap = -3, int gap = -2)
 {
-    int count_match = 0, count_mismatch = 0, count_gap = 0, opening_gap = 0;
+    int count_match = 0, count_mismatch = 0, count_gap = 0;
     string align1 = "", align2 = "";
-    int max_val = findMax(DPmap), num = 0;
+    int i = s1.length(), j = s2.length(); // start traceback from the bottom right corner
 
-    // start traceback from the cell with highest score
-    for (auto item : DPmap)
-    {
-        auto pos = item.first;
-        int score = item.second;
-        if (score != max_val)
-            continue;
 
-        int i = pos.first, j = pos.second;
         cout << "----------" << endl;
-        cout << "Case " << ++num << endl;
 
         align1 = "";
         align2 = "";
         count_match = 0;
         count_mismatch = 0;
         count_gap = 0;
-        opening_gap = 0;
 
-        while (i > 0 && j > 0 && score)
+        while (i > 0 && j > 0)
         {
             int diagonal = 0, above = 0, left = 0;
             if (s1[i - 1] == s2[j - 1])
-                if (DPmap.count({i - 1, j - 1}))
-                    diagonal = DPmap[{i - 1, j - 1}] + match;
+                diagonal = match;
+            else 
+                diagonal = mismatch;
 
-                else if (DPmap.count({i - 1, j - 1}))
-                    diagonal = DPmap[{i - 1, j - 1}] + mismatch;
+            if (DPmap.count({i - 1, j - 1}))
+                diagonal += DPmap[{i - 1, j - 1}];
 
+            left = gap;
             if (DPmap.count({i, j - 1}))
-                left = DPmap[{i, j - 1}] + gap;
-            if (DPmap.count({i - 1, j}))
-                above = DPmap[{i - 1, j}] + gap;
+                left += DPmap[{i, j - 1}];
+            
+            if (gap_extend[{i, j - 1}] != true)
+                left += open_gap;
 
-            score = max({diagonal, above, left});
+            above = gap;
+            if (DPmap.count({i - 1, j}))
+                above += DPmap[{i - 1, j}];
+
+            if (gap_extend[{i - 1, j}] != true)
+                above += open_gap;
+
+            int score = max({diagonal, above, left});
+
             if (diagonal == score)
             {
                 align1 = s1[--i] + align1;
@@ -140,16 +160,12 @@ void traceBack(map<pair<int, int>, int> DPmap, string s1, string s2, int match =
             {
                 align1 = s1[--i] + align1;
                 align2 = "-" + align2;
-                if (opening_gap == 0)
-                    opening_gap++;
                 count_gap++;
             }
             else if (left == score)
             {
                 align1 = "-" + align1;
                 align2 = s2[--j] + align2;
-                if (opening_gap == 0)
-                    opening_gap++;
                 count_gap++;
             }
             else
@@ -165,10 +181,11 @@ void traceBack(map<pair<int, int>, int> DPmap, string s1, string s2, int match =
         cout << "Match: " << count_match << " | ";
         cout << "Mismatch: " << count_mismatch << " | ";
         cout << "Gap: " << count_gap << " | ";
-        cout << "Opening gap: " << opening_gap << endl;
         cout << endl;
     }
-}
+
+
+
 
 int main()
 {
@@ -176,9 +193,10 @@ int main()
     // string s2 = "ACATGCGACACTACTCCGATACCCCGTAACCGATAACGATACAGAGACCTCGTACGCTTGCTAATAACCGAGAACGATTGACATTCCTCGTACAGCTACACGTACTCCGAT";
     string s1, s2;
     int max_val = INT_MIN;
-    int match_val, mismatch_val, gap;
+    int match_val, mismatch_val, open_gap, gap;
+    map<pair<int, int>, bool> gap_extend;
 
-    cout << "Smith-Waterman Algorithm" << endl;
+    cout << "Smith-Waterman-Beyer Algorithm" << endl;
     cout << "1st string: ";
     cin >> s1;
 
@@ -191,11 +209,15 @@ int main()
     cout << "Mismatch: ";
     cin >> mismatch_val;
 
+    cout << "Open gap: ";
+    cin >> open_gap;
+
     cout << "Gap: ";
     cin >> gap;
 
-    map<pair<int, int>, int> DPmap = smithWaterman(s1, s2, match_val, mismatch_val, gap);
+    map<pair<int, int>, int> DPmap = smithWaterman(gap_extend, s1, s2, match_val, mismatch_val, open_gap, gap);
+    printMap(DPmap, s1, s2);
+    traceBack(DPmap, gap_extend, s1, s2, match_val, mismatch_val, gap);
 
-    traceBack(DPmap, s1, s2, match_val, mismatch_val, gap);
     return 0;
 }
